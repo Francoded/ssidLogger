@@ -1,12 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 15
-    buildToolsVersion "22.0.1"
+    compileSdkVersion 19
+    buildToolsVersion '28.0.3'
 
     defaultConfig {
         applicationId "org.zordius.ssidlogger"
-        minSdkVersion 15
+        minSdkVersion 19
         targetSdkVersion 19
     }
 

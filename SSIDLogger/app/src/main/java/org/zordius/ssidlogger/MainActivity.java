@@ -80,6 +80,7 @@ public class MainActivity extends Activity {
         ((ToggleButton) findViewById(R.id.activeSwitch)).setEnabled(!isLogging);
         ((ToggleButton) findViewById(R.id.frequencySwitch)).setEnabled(!isLogging);
         ((EditText) findViewById(R.id.editFilename)).setEnabled(!isLogging);
+        WifiReceiver.setLogFile(this, ((EditText) findViewById(R.id.editFilename)).getText().toString());
     }
 
     public void updateFileStatus() {

@@ -23,7 +23,7 @@ import android.util.Log;
 
 public class WifiReceiver extends BroadcastReceiver {
     public static final String PREFERENCES = "org.zordius.ssidlogger.preference";
-    public static final String LOGFILE = "ssidLogger.log";
+    public static final String LOGFILE = "ssidLogger.txt";
     public static final String PREF_LOGFILE = "logFile";
     public static final String PREF_ACTIVE = "activeScan";
     public static final String PREF_SCANINTERVAL = "scanInterval";
@@ -127,6 +127,8 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     public static int getLogSize() {
+        if (logFile == null)
+            return 0;
         return (int) ((new File(logFile)).length() / 1024);
     }
 
