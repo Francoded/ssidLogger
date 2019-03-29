@@ -1,9 +1,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="10dp"
-    tools:context="${packageName}.${activityClass}" >
+    android:padding="10dp">
 
     <LinearLayout
         android:id="@+id/topButtons"
@@ -22,13 +20,13 @@
             android:textOn="@string/logging" />
 
         <Button
-            android:id="@+id/btnScan"
+            android:id="@+id/btnFingerprint"
             style="@style/defaultMarginLeft"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".5"
-            android:onClick="onClickScan"
-            android:text="@string/scan_now" />
+            android:onClick="onClickFingerprint"
+            android:text="@string/fingerprint" />
     </LinearLayout>
 
     <LinearLayout
@@ -37,16 +35,15 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/topButtons">
 
-        <ToggleButton
-            android:id="@+id/activeSwitch"
+        <Button
+            android:id="@+id/btnMode"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight=".5"
             android:checked="false"
-            android:onClick="onClickActive"
+            android:onClick="onClickMode"
             android:textAppearance="?android:attr/textAppearanceMedium"
-            android:textOff="@string/passive"
-            android:textOn="@string/active" />
+            android:text="@string/passive"/>
 
         <ToggleButton
             android:id="@+id/frequencySwitch"
@@ -55,10 +52,10 @@
             android:layout_height="wrap_content"
             android:layout_weight=".5"
             android:checked="false"
-            android:onClick="onClickFequency"
+            android:onClick="onClickFrequency"
             android:textAppearance="?android:attr/textAppearanceMedium"
-            android:textOff="@string/oneMinutes"
-            android:textOn="@string/thirtySeconds" />
+            android:textOff="@string/infrequent"
+            android:textOn="@string/frequent" />
     </LinearLayout>
 
     <TextView

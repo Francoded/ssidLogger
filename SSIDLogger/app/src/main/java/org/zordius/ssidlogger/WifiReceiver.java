@@ -4,8 +4,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
@@ -22,28 +25,77 @@ import android.os.StatFs;
 import android.util.Log;
 
 public class WifiReceiver extends BroadcastReceiver {
+
+    // Helper WiFiScan class for Fingerprint
+    public class WiFiScan {
+
+        public WiFiScan(){ accessPoints = new HashMap<String, String>(); }
+
+        public void addAccessPoint(String BSSID, String SSID){
+            accessPoints.put(BSSID,SSID);
+        }
+
+        // Key is BSSID - Unique
+        // Value is SSID
+        HashMap<String,String> accessPoints;
+
+    }
+
+    // Mode can be PASSIVE - 0
+    // Mode can be ACTIVE - 1
+    // Mode can be FSU - 2
+    public enum  MODE { ACTIVE, PASSIVE, FSU }
+
     public static final String PREFERENCES = "org.zordius.ssidlogger.preference";
-    public static final String LOGFILE = "ssidLogger.txt";
-    public static final String PREF_LOGFILE = "logFile";
-    public static final String PREF_ACTIVE = "activeScan";
+    public static final String LOGFILE = "SSIDLogger/test.csv";
+    public static final String PREF_LOGFILE = "SSIDLogger/test.csv";
+    public static final String PREF_MODE = "0";
     public static final String PREF_SCANINTERVAL = "scanInterval";
-    public static final String ACTION_UPDATE = "org.zordius.ssidlogger.action_update";
+    public static final String PREF_FREQUENT = "false";
+
 
     public static WifiManager wifi = null;
     public static AlarmManager alarm = null;
     public static PendingIntent pending = null;
+
+    public static int frequency = 60;
+    public static boolean frequent = false;
+    public static boolean receiving = false;
+
+    public static MODE currentMode = MODE.PASSIVE;
+    public static BlockingQueue<WiFiScan> fingerprint;
+    public static boolean hasFingerprint = false;
+
     public static SharedPreferences pref = null;
     public static String logFile = null;
-    public static boolean activeScan = false;
-    public static int frequency = 60;
 
     public static void init(Context context) {
-        pref = context.getSharedPreferences(PREFERENCES,
-                Context.MODE_PRIVATE);
+
+        // Initialize WiFi Manager
+        // FIXME: Add .getApplicationContext() ?
         wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+        fingerprint = new ArrayBlockingQueue<WiFiScan>(4);
+
+        // Load saved preferences
+        pref = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
         logFile = pref.getString(PREF_LOGFILE, null);
-        activeScan = pref.getBoolean(PREF_ACTIVE, false);
         frequency = pref.getInt(PREF_SCANINTERVAL, 60);
+        frequent = pref.getBoolean(PREF_FREQUENT,false);
+
+        switch(pref.getInt(PREF_MODE,0))
+        {
+            case 0:
+            default:
+                currentMode = MODE.PASSIVE;
+                break;
+            case 1:
+                currentMode = MODE.ACTIVE;
+                break;
+            case 2:
+                currentMode = MODE.FSU;
+                break;
+        }
+
 
         if (logFile == null) {
             logFile = Environment.getExternalStorageDirectory().toString()
@@ -58,20 +110,26 @@ public class WifiReceiver extends BroadcastReceiver {
 
     public static void toggleScan(Context context, boolean enable) {
         if (enable) {
+            hasFingerprint = false;
+            fingerprint.clear();
+
             doScan(context);
-            if (activeScan) {
+            if (currentMode != MODE.PASSIVE) {
                 setAlarm(context);
             }
         } else {
             receiveWifi(context, false);
-            if (activeScan) {
+            if (currentMode != MODE.PASSIVE) {
                 cancelAlarm(context);
             }
         }
     }
 
     public static void doScan(Context context) {
-        writeLog("SCAN");
+        // If already receiving, do nothing
+        if (receiving)
+            return;
+
         receiveWifi(context, true);
         if (wifi.isWifiEnabled()) {
             wifi.startScan();
@@ -80,14 +138,53 @@ public class WifiReceiver extends BroadcastReceiver {
         }
     }
 
-    public static void toggleActive(Context context) {
-        activeScan = !activeScan;
-        pref.edit().putBoolean(PREF_ACTIVE, activeScan).commit();
+    public static void toggleFingerprint(Context context) {
+        hasFingerprint = !hasFingerprint;
+        writeLog("FINGERPRINT");
     }
 
-    public static void toggleLongScan(Context context) {
-        frequency = 90 - frequency;
+    public static void toggleMode(Context context, int mode) {
+        switch (mode)
+        {
+            case 0:
+                currentMode = MODE.PASSIVE;
+                pref.edit().putInt(PREF_MODE, mode).commit();
+                break;
+            case 1:
+                currentMode = MODE.ACTIVE;
+                pref.edit().putInt(PREF_MODE, mode).commit();
+                break;
+            case 2:
+                currentMode = MODE.FSU;
+                pref.edit().putInt(PREF_MODE, mode).commit();
+                break;
+            default:
+                break;
+        }
+    }
+
+    public static String getMode(Context context) {
+        if (currentMode == MODE.ACTIVE)
+            return context.getResources().getString(R.string.active);
+        else if (currentMode == MODE.FSU)
+            return context.getResources().getString(R.string.parkingMode);
+        else
+            return context.getResources().getString(R.string.passive);
+    }
+
+    public static void toggleLongScan(boolean isFrequent) {
+
+        if (currentMode == MODE.ACTIVE)
+        {
+            frequency = isFrequent ? 30 : 60;
+        } else if (currentMode == MODE.FSU)
+        {
+            frequency = isFrequent ? 2 : 30;
+        }
+
+        frequent = isFrequent;
         pref.edit().putInt(PREF_SCANINTERVAL, frequency).commit();
+        pref.edit().putBoolean(PREF_FREQUENT, frequent).commit();
     }
 
     public static boolean setLogFile(Context context, String name) {
@@ -113,10 +210,8 @@ public class WifiReceiver extends BroadcastReceiver {
 
         try {
             FileWriter log = new FileWriter(logFile, true);
-            log.write(String.valueOf(System.currentTimeMillis())
-                    + " "
-                    + new SimpleDateFormat("yyyy.MM.dd HH:mm:ss z", Locale.US)
-                    .format(new Date()) + "\t" + text + "\n");
+            log.write(new SimpleDateFormat("HH:mm:ss z", Locale.US)
+                    .format(new Date()) + "," + text + "\n");
             log.close();
             return true;
         } catch (Exception e) {
@@ -142,7 +237,17 @@ public class WifiReceiver extends BroadcastReceiver {
     }
 
     protected static void setAlarm(Context context) {
+
         readyAlarm(context);
+
+        // Set Frequency based on mode
+        if (currentMode == MODE.ACTIVE) {
+            frequency = frequent ? 30 : 60;
+        } else if (currentMode == MODE.FSU) {
+            frequency = frequent ? 2 : 30;
+        }
+        pref.edit().putInt(PREF_SCANINTERVAL, frequency).commit();
+
         alarm.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(),
                 1000 * frequency, pending);
     }
@@ -162,20 +267,42 @@ public class WifiReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        String action = intent.getAction();
 
         // Handle wifi scan result
+        String action = intent.getAction();
+        System.out.println("GOT INTENT: " + action);
         if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
+            // Receiving Lock?
+            receiving = true;
+
+            writeLog("SCAN");
+            // get wifi scan results and write/store them
             List<ScanResult> results = wifi.getScanResults();
+            WiFiScan current = new WiFiScan();
             for (ScanResult R : results) {
-                writeLog("WIFI " + R.BSSID + " " + R.level + " "
-                        + R.SSID);
+                current.addAccessPoint(R.BSSID,R.SSID);
+                writeLog(R.BSSID + "," + R.level + "," + R.SSID);
             }
-            context.sendBroadcast(new Intent(ACTION_UPDATE));
+
+            // Modify fingerprint if needed
+            if (!hasFingerprint || fingerprint.remainingCapacity() != 0) {
+                System.out.println("Still no valid fingerprint!");
+                if (fingerprint.remainingCapacity() == 0) {
+                    fingerprint.remove();
+                }
+                fingerprint.add(current);
+            } else if (hasFingerprint) {
+                System.out.println("Valid fingerprint!");
+
+            }
+
+            context.sendBroadcast(new Intent("ACTION_UPDATE"));
+
+            // No longer receiving results
+            receiving = false;
             return;
         }
 
-        // No action, it should be my alarm intent
         doScan(context);
     }
 }

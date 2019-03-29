@@ -12,10 +12,11 @@
     <string name="not_logging">start log</string>
     <string name="comment">Comment</string>
     <string name="write_comment_into_log_file_">Write comment into log file...</string>
-    <string name="scan_now">Scan Now</string>
-    <string name="oneMinutes">1 minutes</string>
-    <string name="thirtySeconds">30 seconds</string>
-    <string name="active">active</string>
-    <string name="passive">passive</string>
+    <string name="fingerprint">Fingerprint</string>
+    <string name="infrequent">Infrequent</string>
+    <string name="frequent">Frequent</string>
+    <string name="active">Active</string>
+    <string name="passive">Passive</string>
+    <string name="parkingMode">Intelli-Parking</string>
 
 </resources>
